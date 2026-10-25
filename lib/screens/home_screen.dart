@@ -4,6 +4,7 @@ import 'session_setup_screen.dart';
 import 'history_screen.dart';
 import '../services/usage_service.dart';
 import '../services/app_mapper.dart';
+import '../services/notification_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -223,6 +224,27 @@ class _HomeScreenState extends State<HomeScreen> {
                   icon: const Icon(Icons.history_rounded, size: 22),
                   label: const Text(
                     'View Session History',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: TextButton.icon(
+                  onPressed: () async {
+                    await NotificationService.showTestNotification();
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.blueAccent,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                  ),
+                  icon: const Icon(Icons.notifications_active, size: 22),
+                  label: const Text(
+                    'Test Notification',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ),
