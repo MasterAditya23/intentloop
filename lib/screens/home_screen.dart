@@ -1,14 +1,67 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'session_setup_screen.dart';
 import 'history_screen.dart';
+import '../services/usage_service.dart';
+import '../services/app_mapper.dart';
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  bool _hasUsagePermission = false;
+  Timer? _monitorTimer;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkPermission();
+    _startAppMonitoring();
+  }
+
+  @override
+  void dispose() {
+    _monitorTimer?.cancel();
+    super.dispose();
+  }
+
+  Future<void> _checkPermission() async {
+    bool granted = await UsageService.hasPermission();
+    setState(() {
+      _hasUsagePermission = granted;
+    });
+  }
+
+  // Continuously check if a monitored app was opened in the background
+  void _startAppMonitoring() {
+    _monitorTimer = Timer.periodic(const Duration(seconds: 4), (timer) async {
+      if (!_hasUsagePermission) return;
+
+      String? recentPackage = await UsageService.getRecentActiveApp();
+      if (recentPackage != null) {
+        String? mappedApp = AppMapper.getAppName(recentPackage);
+        if (mappedApp != null && mounted) {
+          // Prevent popping multiple screens if already navigating
+          // Automatically trigger session setup for the detected app
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => const SessionSetupScreen(),
+            ),
+          );
+        }
+      }
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF121212), // Dark, sleek attention-economy theme
+      backgroundColor: const Color(0xFF121212),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24.0),
@@ -16,7 +69,6 @@ class HomeScreen extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const SizedBox(height: 40),
-              // App Branding
               Row(
                 children: [
                   Container(
@@ -56,7 +108,40 @@ class HomeScreen extends StatelessWidget {
                 ],
               ),
               const Spacer(),
-              // Center Hero Illustration / Quote
+              if (!_hasUsagePermission)
+                Container(
+                  margin: const EdgeInsets.only(bottom: 20),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.orange.withOpacity(0.15),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(color: Colors.orange.withOpacity(0.4)),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Text(
+                        '⚠️ System Permission Required',
+                        style: TextStyle(color: Colors.orangeAccent, fontWeight: FontWeight.bold),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'To automatically detect distracting apps, IntentLoop needs Usage Access permission.',
+                        style: TextStyle(color: Colors.grey, fontSize: 13),
+                      ),
+                      const SizedBox(height: 12),
+                      ElevatedButton(
+                        onPressed: () async {
+                          await UsageService.requestPermission();
+                          await Future.delayed(const Duration(seconds: 2));
+                          _checkPermission();
+                        },
+                        style: ElevatedButton.styleFrom(backgroundColor: Colors.orange),
+                        child: const Text('Grant Usage Access', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+                      ),
+                    ],
+                  ),
+                ),
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
@@ -89,7 +174,6 @@ class HomeScreen extends StatelessWidget {
                 ),
               ),
               const Spacer(),
-              // Action Buttons
               SizedBox(
                 width: double.infinity,
                 height: 56,
@@ -108,7 +192,6 @@ class HomeScreen extends StatelessWidget {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    elevation: 4,
                   ),
                   icon: const Icon(Icons.play_arrow_rounded, size: 24),
                   label: const Text(
