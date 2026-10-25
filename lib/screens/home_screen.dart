@@ -37,7 +37,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  // Continuously check if a monitored app was opened in the background
   void _startAppMonitoring() {
     _monitorTimer = Timer.periodic(const Duration(seconds: 4), (timer) async {
       if (!_hasUsagePermission) return;
@@ -46,8 +45,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (recentPackage != null) {
         String? mappedApp = AppMapper.getAppName(recentPackage);
         if (mappedApp != null && mounted) {
-          // Prevent popping multiple screens if already navigating
-          // Automatically trigger session setup for the detected app
           Navigator.push(
             context,
             MaterialPageRoute(
@@ -234,7 +231,23 @@ class _HomeScreenState extends State<HomeScreen> {
                 height: 56,
                 child: TextButton.icon(
                   onPressed: () async {
-                    await NotificationService.showTestNotification();
+                    final TimeOfDay? selectedTime = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.now(),
+                    );
+                    
+                    if (selectedTime != null) {
+                      await NotificationService.scheduleDailyReminder(selectedTime);
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('Daily reminder set for ${selectedTime.format(context)}'),
+                            backgroundColor: Colors.deepPurple,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                    }
                   },
                   style: TextButton.styleFrom(
                     foregroundColor: Colors.blueAccent,
@@ -242,9 +255,9 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(16),
                     ),
                   ),
-                  icon: const Icon(Icons.notifications_active, size: 22),
+                  icon: const Icon(Icons.alarm_add_rounded, size: 22),
                   label: const Text(
-                    'Test Notification',
+                    'Set Daily Reminder',
                     style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
                   ),
                 ),
