@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'session_setup_screen.dart';
 import 'history_screen.dart';
 import '../services/usage_service.dart';
-import '../services/app_mapper.dart';
 import '../services/notification_service.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -15,44 +14,19 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _hasUsagePermission = false;
-  Timer? _monitorTimer;
 
   @override
   void initState() {
     super.initState();
     _checkPermission();
-    _startAppMonitoring();
-  }
-
-  @override
-  void dispose() {
-    _monitorTimer?.cancel();
-    super.dispose();
+    // Intentionally removed _startAppMonitoring() here because our new 
+    // Foreground Service now handles this safely in the background!
   }
 
   Future<void> _checkPermission() async {
     bool granted = await UsageService.hasPermission();
     setState(() {
       _hasUsagePermission = granted;
-    });
-  }
-
-  void _startAppMonitoring() {
-    _monitorTimer = Timer.periodic(const Duration(seconds: 4), (timer) async {
-      if (!_hasUsagePermission) return;
-
-      String? recentPackage = await UsageService.getRecentActiveApp();
-      if (recentPackage != null) {
-        String? mappedApp = AppMapper.getAppName(recentPackage);
-        if (mappedApp != null && mounted) {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => const SessionSetupScreen(),
-            ),
-          );
-        }
-      }
     });
   }
 

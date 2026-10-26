@@ -82,7 +82,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween, // Fixed here
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
                                 session.targetApp,
@@ -108,20 +108,24 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           ),
                           const SizedBox(height: 12),
                           Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween, // Fixed here
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(
                                 '${session.startedAt.day}/${session.startedAt.month} at ${session.startedAt.hour.toString().padLeft(2, '0')}:${session.startedAt.minute.toString().padLeft(2, '0')}',
                                 style: TextStyle(color: Colors.grey.shade600, fontSize: 12),
                               ),
+                              // ---> THIS IS THE UPDATED PART <---
                               Text(
                                 'Outcome: ${session.outcome.toUpperCase()}',
                                 style: TextStyle(
-                                  color: session.outcome == 'stopped' ? Colors.greenAccent : Colors.orangeAccent,
+                                  color: session.outcome == 'completed' 
+                                      ? Colors.greenAccent 
+                                      : (session.outcome == 'abandoned' ? Colors.redAccent : Colors.orangeAccent),
                                   fontSize: 12,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
+                              // -----------------------------------
                             ],
                           ),
                         ],

@@ -1,11 +1,16 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../models/session.dart';
 import '../services/storage_service.dart';
 
 class ActiveSessionScreen extends StatefulWidget {
   final Session session;
-  const ActiveSessionScreen({super.key, required this.session});
+
+  const ActiveSessionScreen({
+    super.key,
+    required this.session,
+  });
 
   @override
   State<ActiveSessionScreen> createState() => _ActiveSessionScreenState();
@@ -13,15 +18,21 @@ class ActiveSessionScreen extends StatefulWidget {
 
 class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
   late Timer _timer;
-  int _secondsElapsed = 0;
+  late int _remainingSeconds;
 
   @override
   void initState() {
     super.initState();
+    _remainingSeconds = widget.session.intendedDurationSeconds;
+    
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _secondsElapsed++;
-      });
+      if (_remainingSeconds > 0) {
+        setState(() {
+          _remainingSeconds--;
+        });
+      } else {
+        _timer.cancel();
+      }
     });
   }
 
@@ -31,117 +42,148 @@ class _ActiveSessionScreenState extends State<ActiveSessionScreen> {
     super.dispose();
   }
 
-  void _finishSession(String outcome) async {
-    widget.session.endedAt = DateTime.now();
-    widget.session.observedUsageSeconds = _secondsElapsed;
-    widget.session.outcome = outcome;
-    await StorageService.saveSession(widget.session);
+  String get timerString {
+    int minutes = _remainingSeconds ~/ 60;
+    int seconds = _remainingSeconds % 60;
+    return '${minutes.toString().padLeft(2, '0')}:${seconds.toString().padLeft(2, '0')}';
+  }
 
-    if (!mounted) return;
-    Navigator.pop(context); // Return to Home
+ void _finishSession(String outcome) async {
+    widget.session.outcome = outcome;
+    widget.session.endedAt = DateTime.now();
+    
+    // Save to the local database before leaving the screen!
+    await StorageService.saveSession(widget.session);
+    
+    if (mounted) {
+      Navigator.pop(context);
+    }
+  }
+  void _addMoreTime() {
+    setState(() {
+      _remainingSeconds += 300; // Adds exactly 5 minutes
+    });
+    // Restart timer if it had reached zero
+    if (!_timer.isActive) {
+      _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (_remainingSeconds > 0) {
+          setState(() {
+            _remainingSeconds--;
+          });
+        } else {
+          _timer.cancel();
+        }
+      });
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    int targetSecs = widget.session.intendedDurationSeconds;
-    int remainingSecs = targetSecs - _secondsElapsed;
-    bool isOvertime = remainingSecs < 0;
-    int displaySecs = isOvertime ? _secondsElapsed - targetSecs : remainingSecs;
-
-    String timeFormatted = '${(displaySecs ~/ 60).toString().padLeft(2, '0')}:${(displaySecs % 60).toString().padLeft(2, '0')}';
-
-    return WillPopScope(
-      onWillPop: () async => false, // Prevent accidental back button press
-      child: Scaffold(
-        backgroundColor: const Color(0xFF121212),
-        body: SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(24.0),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.deepPurpleAccent.withOpacity(0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    'Active Session: ${widget.session.targetApp}',
-                    style: const TextStyle(color: Colors.deepPurpleAccent, fontWeight: FontWeight.bold),
-                  ),
+    return Scaffold(
+      backgroundColor: const Color(0xFF121212),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(24.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Text(
+                'YOUR CURRENT INTENTION',
+                style: TextStyle(
+                  color: Colors.deepPurpleAccent, 
+                  fontSize: 14,
+                  letterSpacing: 1.5,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 24),
-                Text(
-                  isOvertime ? 'Overtime By' : 'Time Remaining',
-                  style: const TextStyle(color: Colors.grey, fontSize: 16),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                widget.session.intention,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 28,
+                  fontWeight: FontWeight.w600,
                 ),
-                const SizedBox(height: 12),
-                Text(
-                  timeFormatted,
-                  style: TextStyle(
-                    color: isOvertime ? Colors.redAccent : Colors.white,
-                    fontSize: 64,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
+              ),
+              const SizedBox(height: 60),
+              Text(
+                timerString,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 72,
+                  fontWeight: FontWeight.bold,
+                  fontFeatures: [FontFeature.tabularFigures()],
                 ),
-                const SizedBox(height: 32),
-                Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(20),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF1E1E1E),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: Colors.grey.shade900),
-                  ),
-                  child: Column(
-                    children: [
-                      const Text(
-                        'Your Intention:',
-                        style: TextStyle(color: Colors.grey, fontSize: 12),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '"${widget.session.intention}"',
-                        textAlign: TextAlign.center,
-                        style: const TextStyle(color: Colors.white, fontSize: 16, fontStyle: FontStyle.italic),
-                      ),
-                    ],
-                  ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _remainingSeconds > 0 ? 'Time Remaining' : 'Time is up!',
+                style: TextStyle(
+                  color: _remainingSeconds > 0 ? Colors.grey : Colors.redAccent, 
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
                 ),
-                const SizedBox(height: 48),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: ElevatedButton.icon(
-                    onPressed: () => _finishSession('stopped'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.green.shade700,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              const SizedBox(height: 60),
+              
+              // 1. "I have done all" Button
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton.icon(
+                  onPressed: () => _finishSession('completed'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.deepPurpleAccent,
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    icon: const Icon(Icons.check_circle_outline_rounded),
-                    label: const Text('I am done. Close App.', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  icon: const Icon(Icons.check_circle_outline, size: 24),
+                  label: const Text(
+                    'I have done all I needed', 
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)
                   ),
                 ),
-                const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  height: 56,
-                  child: OutlinedButton.icon(
-                    onPressed: () => _finishSession('extended'),
-                    style: OutlinedButton.styleFrom(
-                      foregroundColor: Colors.orangeAccent,
-                      side: const BorderSide(color: Colors.orangeAccent),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              ),
+              const SizedBox(height: 16),
+
+              // 2. "I want more time" Button
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: OutlinedButton.icon(
+                  onPressed: _addMoreTime,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.white,
+                    side: BorderSide(color: Colors.deepPurpleAccent.withOpacity(0.5), width: 2),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
                     ),
-                    icon: const Icon(Icons.more_time_rounded),
-                    label: const Text('I need more time', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                  ),
+                  icon: const Icon(Icons.add_alarm, size: 22),
+                  label: const Text(
+                    'I want more time (+5 min)', 
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)
                   ),
                 ),
-              ],
-            ),
+              ),
+              const SizedBox(height: 16),
+
+              // 3. End Early Button
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: TextButton(
+                  onPressed: () => _finishSession('abandoned'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.grey,
+                  ),
+                  child: const Text('End Session Early', style: TextStyle(fontSize: 16)),
+                ),
+              ),
+            ],
           ),
         ),
       ),
