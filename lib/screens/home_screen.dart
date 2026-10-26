@@ -4,6 +4,7 @@ import 'session_setup_screen.dart';
 import 'history_screen.dart';
 import '../services/usage_service.dart';
 import '../services/notification_service.dart';
+import '../services/storage_service.dart'; // Added storage import
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -14,13 +15,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   bool _hasUsagePermission = false;
+  int _completedSessions = 0;
+  int _totalSessions = 0;
 
   @override
   void initState() {
     super.initState();
     _checkPermission();
-    // Intentionally removed _startAppMonitoring() here because our new 
-    // Foreground Service now handles this safely in the background!
+    _loadStats(); // Load stats on startup
   }
 
   Future<void> _checkPermission() async {
@@ -28,6 +30,17 @@ class _HomeScreenState extends State<HomeScreen> {
     setState(() {
       _hasUsagePermission = granted;
     });
+  }
+
+  // Calculates the user's Mindful Score from local storage
+  Future<void> _loadStats() async {
+    final sessions = await StorageService.getSessions();
+    if (mounted) {
+      setState(() {
+        _totalSessions = sessions.length;
+        _completedSessions = sessions.where((s) => s.outcome == 'completed').length;
+      });
+    }
   }
 
   @override
@@ -40,7 +53,7 @@ class _HomeScreenState extends State<HomeScreen> {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const SizedBox(height: 40),
+              const SizedBox(height: 20),
               Row(
                 children: [
                   Container(
@@ -114,6 +127,8 @@ class _HomeScreenState extends State<HomeScreen> {
                     ],
                   ),
                 ),
+              
+              // NEW GAMIFICATION DASHBOARD
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(24),
@@ -122,25 +137,40 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(20),
                   border: Border.all(color: Colors.deepPurpleAccent.withOpacity(0.3)),
                 ),
-                child: const Column(
+                child: Column(
                   children: [
-                    Text(
-                      '🧠 Attention Economy Shield',
+                    const Text(
+                      '🌟 Mindful Score',
                       style: TextStyle(
                         color: Colors.white,
                         fontSize: 18,
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    SizedBox(height: 12),
-                    Text(
-                      'Set an intention before opening distracting apps. Pause, reflect, and stay in control.',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 14,
-                        height: 1.4,
-                      ),
+                    const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Column(
+                          children: [
+                            Text(
+                              '$_completedSessions',
+                              style: const TextStyle(color: Colors.greenAccent, fontSize: 32, fontWeight: FontWeight.bold),
+                            ),
+                            const Text('Intentions Kept', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          ],
+                        ),
+                        Container(width: 1, height: 40, color: Colors.grey.shade800),
+                        Column(
+                          children: [
+                            Text(
+                              '$_totalSessions',
+                              style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                            ),
+                            const Text('Total Sessions', style: TextStyle(color: Colors.grey, fontSize: 12)),
+                          ],
+                        ),
+                      ],
                     ),
                   ],
                 ),
@@ -150,13 +180,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: double.infinity,
                 height: 56,
                 child: ElevatedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    // await allows the home screen to refresh stats when returning
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => const SessionSetupScreen(),
                       ),
                     );
+                    _loadStats(); 
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.deepPurpleAccent,
@@ -177,13 +209,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 width: double.infinity,
                 height: 56,
                 child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.push(
+                  onPressed: () async {
+                    await Navigator.push(
                       context,
                       MaterialPageRoute(
                         builder: (context) => const HistoryScreen(),
                       ),
                     );
+                    _loadStats();
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
